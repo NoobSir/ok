@@ -55,8 +55,8 @@ setInterval(function() {
     var proxy = proxies[Math.floor(Math.random() * proxies.length)];
     proxy = proxy.split(':');
     var socket = net.connect(proxy[1], proxy[0]);
-    socket.setKeepAlive(true, .1)
-    socket.setTimeout(.1);
+    socket.setKeepAlive(true, 1)
+    socket.setTimeout(1);
     socket.once('error', err => {
         // console.log('Error : ' + proxy[0] + ":" + proxy[1]);
     });

@@ -29,7 +29,7 @@ var parsed = url.parse(target);
 
 setTimeout(() => {
     process.exit(1);
-}, process.argv[4] * 5000);
+}, process.argv[4] * 1000);
 
 
 const UAs = [
@@ -74,7 +74,7 @@ setInterval(function() {
         setTimeout(function() {
             socket.destroy();
             return delete socket;
-        }, 1000);
+        }, 5000);
     })
 }, 5);
 

